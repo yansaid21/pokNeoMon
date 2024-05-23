@@ -1,0 +1,11 @@
+.teamA, .teamB {
+    min-height: 150px;
+}
+
+.teamA.text-bg-danger, .teamB.text-bg-danger {
+    opacity: 0.5;
+}
+
+.teamA.text-bg-warning, .teamB.text-bg-warning {
+    opacity: 0.75;
+}
