@@ -62,26 +62,43 @@ async function listPokemon(limit, offset ) {
  * @returns la lista de pokemon que coinciden con el criterio de búsqueda
  */
 async function queryPokemon(query, limit, offset) {
-    let queryStr = 'MATCH (p:Pokemon) WHERE ';
+    let queryStr = 'MATCH (p:Pokemon) ';
     limit = neo4j.int(limit);
     offset = neo4j.int(offset);
     const params = { limit, offset };
     if (typeof query === 'string') {
-      queryStr += 'p.name CONTAINS $query OR p.species CONTAINS $query OR p.description CONTAINS $query';
+      queryStr += 'WHERE p.name CONTAINS $query OR p.species CONTAINS $query OR p.description CONTAINS $query';
       params.query = query;
     } else if (typeof query === 'object') {
       const conditions = [];
-      for (const key in query) {
-       /*  console.log("query en for",typeof query); */
-        conditions.push(`p.${key} = ${query.id}`);
-        /* console.log("conditions",conditions); */
-        params[key] = query[key];
-       /*  console.log("params for ",params); */
-      }
-      queryStr += conditions.join(' AND ');
+
+        if(query.name){
+            conditions.push(`p.name CONTAINS $name`);
+            params['name'] = query['name'];
+        }
+        if(query.id){
+            conditions.push(`p.id = $id`);
+            params['id'] = neo4j.int(query['id']);
+        }
+        if(query.types){
+            conditions.push(`(p)-[:HAS]->(:Type{name: $types})`);
+            params['types'] = query['types'];
+        }
+        if(query.species){
+            conditions.push(`p.species CONTAINS $species`);
+            params['species'] = query['species'];
+        }
+        if(query.description){
+            conditions.push(`p.description CONTAINS $description`);
+            params['description'] = query['description'];
+        }
+        if (conditions.length > 0){
+            queryStr += "WHERE " + conditions.join(' AND ');
+        }
     }
     queryStr += ' RETURN p SKIP $offset' + (limit > -1 ? ' LIMIT $limit' : '');
-    /* console.log("queryStr: ",queryStr); */
+    console.log("queryStr: ",queryStr);
+    console.log("params", params);
     const records = await runQuery(queryStr, params);
    /*  console.log(">>>>>",records); */
     return records.map(record => record.get('p').properties);
@@ -130,7 +147,7 @@ async function simulateBattle(teamA, teamB) {
                 MATCH (p:Pokemon {id: ${b}})-[:HAS]->(:Type)-[:EFFECTIVE]->(effectiveType)<-[:HAS]-(e:Pokemon {id: ${a}})
                 RETURN COUNT(e) > 0 AS isEffective
                 `;
-                result = await runQuery(query, params);  // Ejecutar la segunda consulta
+                result = await runQuery(query, params); 
                 finalResult = result[0]._fields[result[0]._fieldLookup['isEffective']];
                 if (finalResult == true) {
                     finalResult = -1;
@@ -152,14 +169,30 @@ async function simulateBattle(teamA, teamB) {
  * @returns Un pokemon que es fuerte contra todos los pokemon dados
  */
 async function findStrongAgainst(pid) {
-    const query = `
-      MATCH (p:Pokemon)-[:HAS]->(t:Type)-[:EFFECTIVE]->(strongType:Type)<-[:HAS]-(strong:Pokemon)
-      WHERE p.id = $pid
-      RETURN strong
+/*     MATCH (p:Pokemon)-[:HAS]->(t:Type)-[:EFFECTIVE]->(strongType:Type)<-[:HAS]-(strong:Pokemon)
+    WHERE p.id = $pid
+    RETURN strong */
+    const query = `MATCH (p:Pokemon)-[:HAS]->(:Type)-[:EFFECTIVE]->(:Type)<-[:HAS]-(e:Pokemon {id: $pida})
+WITH p
+MATCH (p)-[:HAS]->(:Type)-[:EFFECTIVE]->(:Type)<-[:HAS]-(i:Pokemon {id: $pidb})
+WITH p
+MATCH (p)-[:HAS]->(:Type)-[:EFFECTIVE]->(:Type)<-[:HAS]-(o:Pokemon {id: $pidc})
+RETURN p
     `;
-    const params = { pid: neo4j.int(pid) };
-    const records = await runQuery(query, params);
-    return records.length ? records[0].get('strong').properties : null;
+    pids=[]
+    pids= pid.split(',');
+    console.log(pid);
+        const params = { pida: neo4j.int(pids[0]),
+            pidb: neo4j.int(pids[1]),
+            pidc: neo4j.int(pids[2]),
+         };
+         console.log(params);
+         console.log(query);
+        const records = await runQuery(query, params);
+        console.log(records[0].get('p').properties);
+        return records.length ? records[0].get('p').properties : null;
+
+    
   }
 
 exports.listPokemon = listPokemon;

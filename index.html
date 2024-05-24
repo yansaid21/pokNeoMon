@@ -208,7 +208,7 @@
                     return;
                 }
                 const strong = await findStrongAgainst(teamA);
-                selectPokemon(strong.id, "teamB", 3);
+                selectPokemon(strong.id.low, "teamB", 3);
                 return false;
             });
             document.getElementById("simular-btn").addEventListener("click", async function (e) {
